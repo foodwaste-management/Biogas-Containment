@@ -1,204 +1,171 @@
 <?php
+// ============================================================
+// BCMS — USER DASHBOARD
+// ============================================================
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/functions.php';
+require_once __DIR__ . '/../../includes/activity_logger.php';
+
 requireRole('user');
 
-// Fetch latest readings
-$gas     = $pdo->query("SELECT * FROM gas_usage        ORDER BY recorded_at DESC LIMIT 5")->fetchAll();
-$methane = $pdo->query("SELECT * FROM methane_monitoring ORDER BY recorded_at DESC LIMIT 5")->fetchAll();
-$level   = $pdo->query("SELECT * FROM gas_level         ORDER BY recorded_at DESC LIMIT 5")->fetchAll();
+$db     = getDB();
+$uid    = currentUserId();
 
-// Latest single values for cards
-$latestGas     = $gas[0]     ?? null;
-$latestMethane = $methane[0] ?? null;
-$latestLevel   = $level[0]   ?? null;
+// Latest readings for this user
+$gasUsage = $db->prepare("SELECT * FROM gas_usage WHERE user_id=:u ORDER BY recorded_at DESC LIMIT 1");
+$gasUsage->execute([':u'=>$uid]);
+$latestGas = $gasUsage->fetch();
 
-$statusColor = ['SAFE' => '#2ecc71', 'WARNING' => '#f39c12', 'LEAK' => '#e74c3c'];
+$methane = $db->prepare("SELECT * FROM methane_monitoring WHERE user_id=:u ORDER BY recorded_at DESC LIMIT 1");
+$methane->execute([':u'=>$uid]);
+$latestMethane = $methane->fetch();
+
+$level = $db->prepare("SELECT * FROM gas_level WHERE user_id=:u ORDER BY recorded_at DESC LIMIT 1");
+$level->execute([':u'=>$uid]);
+$latestLevel = $level->fetch();
+
+// Count submissions
+$countStmt = $db->prepare("SELECT
+  (SELECT COUNT(*) FROM gas_usage          WHERE user_id=:u) as gas_count,
+  (SELECT COUNT(*) FROM methane_monitoring WHERE user_id=:u) as meth_count,
+  (SELECT COUNT(*) FROM gas_level          WHERE user_id=:u) as lvl_count
+");
+$countStmt->execute([':u'=>$uid]);
+$counts = $countStmt->fetch();
+
+$pageTitle = 'My Dashboard';
+renderHead($pageTitle);
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BCMS — Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<style>
-/* ── Reset & Variables ─────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-    --green:  #2ecc71; --green-dk: #27ae60;
-    --dark:   #0f1a12; --card:     #172419;
-    --border: #2a3d2d; --text:     #d4e6d7;
-    --muted:  #6b8f72; --sidebar:  #111e14;
-    --warn:   #f39c12; --danger:   #e74c3c;
-}
-body { font-family: 'DM Sans', sans-serif; background: var(--dark); color: var(--text); display: flex; min-height: 100vh; }
 
-/* ── Sidebar ───────────────────────────── */
-.sidebar {
-    width: 220px; min-height: 100vh;
-    background: var(--sidebar);
-    border-right: 1px solid var(--border);
-    display: flex; flex-direction: column;
-    padding: 24px 0; flex-shrink: 0;
-}
-.sidebar-logo {
-    display: flex; align-items: center; gap: 10px;
-    padding: 0 20px 28px;
-    border-bottom: 1px solid var(--border);
-}
-.logo-icon { width: 32px; height: 32px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-.logo-text { font-family: 'Space Mono', monospace; font-size: 15px; font-weight: 700; color: #fff; }
-.logo-text span { color: var(--green); }
-nav { padding: 20px 12px; flex: 1; }
-.nav-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 0 8px; margin-bottom: 8px; margin-top: 16px; }
-.nav-link {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 10px; border-radius: 8px;
-    color: var(--muted); text-decoration: none;
-    font-size: 14px; transition: all 0.15s;
-    margin-bottom: 2px;
-}
-.nav-link:hover, .nav-link.active { background: rgba(46,204,113,0.08); color: var(--green); }
-.nav-link .icon { font-size: 16px; width: 20px; text-align: center; }
-.sidebar-footer { padding: 16px 20px; border-top: 1px solid var(--border); }
-.user-info { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
-.user-email { color: var(--text); font-size: 13px; display: block; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.logout-btn {
-    display: block; width: 100%; padding: 8px;
-    background: transparent; border: 1px solid var(--border);
-    border-radius: 6px; color: var(--muted);
-    font-size: 13px; text-align: center;
-    text-decoration: none; transition: all 0.15s;
-}
-.logout-btn:hover { border-color: var(--danger); color: var(--danger); }
+<div class="layout">
+  <?php require_once __DIR__ . '/../../includes/sidebar.php'; ?>
 
-/* ── Main ──────────────────────────────── */
-.main { flex: 1; padding: 32px; overflow-y: auto; }
-.page-title { font-family: 'Space Mono', monospace; font-size: 20px; color: #fff; margin-bottom: 4px; }
-.page-sub   { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
-
-/* ── Stat Cards ────────────────────────── */
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
-.card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 12px; padding: 20px;
-}
-.card-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 10px; }
-.card-value { font-family: 'Space Mono', monospace; font-size: 28px; font-weight: 700; color: #fff; }
-.card-unit  { font-size: 12px; color: var(--muted); margin-top: 4px; }
-.status-badge {
-    display: inline-block; padding: 3px 10px;
-    border-radius: 20px; font-size: 12px; font-weight: 600;
-    margin-top: 6px;
-}
-
-/* ── Table ─────────────────────────────── */
-.section-title { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 12px; }
-.table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
-table { width: 100%; border-collapse: collapse; }
-th { background: rgba(46,204,113,0.06); font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--muted); padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); }
-td { padding: 11px 16px; font-size: 13px; border-bottom: 1px solid rgba(42,61,45,0.5); }
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: rgba(46,204,113,0.03); }
-</style>
-</head>
-<body>
-
-<!-- Sidebar -->
-<aside class="sidebar">
-    <div class="sidebar-logo">
-        <div class="logo-icon">🌿</div>
-        <div class="logo-text">BC<span>MS</span></div>
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title">👤 My Dashboard</div>
+      <div class="topbar-meta">
+        <span class="topbar-time" id="clock"></span>
+        <a href="<?= BASE_URL ?>/app/user/log_reading.php" class="btn btn-primary btn-sm">+ Log Reading</a>
+      </div>
     </div>
-    <nav>
-        <div class="nav-label">Monitor</div>
-        <a href="dashboard.php" class="nav-link active"><span class="icon">📊</span> Dashboard</a>
-        <a href="gas_usage.php" class="nav-link"><span class="icon">🔥</span> Gas Usage</a>
-        <a href="methane.php"   class="nav-link"><span class="icon">⚗️</span> Methane</a>
-        <a href="gas_level.php" class="nav-link"><span class="icon">📈</span> Gas Level</a>
-    </nav>
-    <div class="sidebar-footer">
-        <div class="user-info">
-            <span class="user-email"><?= htmlspecialchars($_SESSION['email']) ?></span>
-            User
-        </div>
-        <a href="/logout.php" class="logout-btn">Sign out</a>
-    </div>
-</aside>
 
-<!-- Main Content -->
-<main class="main">
-    <div class="page-title">Dashboard</div>
-    <div class="page-sub">Live biogas system overview</div>
+    <div class="page-body">
 
-    <!-- Stat Cards -->
-    <div class="cards">
-        <div class="card">
-            <div class="card-label">Gas Flow Rate</div>
-            <div class="card-value"><?= $latestGas ? number_format($latestGas['flow_rate'], 1) : '—' ?></div>
-            <div class="card-unit">m³/hr</div>
+      <!-- Welcome banner -->
+      <div class="panel" style="background:var(--green-900);border:none;margin-bottom:24px;">
+        <div class="panel-body flex items-center justify-between gap-2" style="flex-wrap:wrap;">
+          <div>
+            <p style="color:var(--green-300);font-size:.78rem;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Welcome back</p>
+            <h2 style="font-family:var(--font-serif);font-size:1.5rem;color:#fff;"><?= e(currentEmail()) ?></h2>
+            <p style="color:var(--green-300);font-size:.875rem;margin-top:4px;">Log your sensor readings to keep the system updated.</p>
+          </div>
+          <div style="font-size:3rem;">🫧</div>
         </div>
-        <div class="card">
-            <div class="card-label">Gas Used</div>
-            <div class="card-value"><?= $latestGas ? number_format($latestGas['gas_used'], 1) : '—' ?></div>
-            <div class="card-unit">m³ total</div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid stagger">
+        <div class="stat-card fade-up">
+          <span class="stat-icon">📊</span>
+          <div class="stat-label">Gas Usage Logs</div>
+          <div class="stat-value"><?= $counts['gas_count'] ?></div>
+          <div class="stat-sub">readings submitted</div>
         </div>
-        <div class="card">
-            <div class="card-label">Methane Level</div>
-            <div class="card-value"><?= $latestMethane ? number_format($latestMethane['methane_ppm']) : '—' ?></div>
-            <div class="card-unit">ppm</div>
+        <div class="stat-card fade-up <?= ($latestMethane && $latestMethane['status']==='LEAK') ? 'danger' : (($latestMethane && $latestMethane['status']==='WARNING') ? 'warn' : '') ?>">
+          <span class="stat-icon">⚠️</span>
+          <div class="stat-label">Latest Methane</div>
+          <div class="stat-value">
+            <?= $latestMethane ? number_format($latestMethane['methane_ppm'],0) : '—' ?>
+            <span class="unit">ppm</span>
+          </div>
+          <div class="stat-sub">
             <?php if ($latestMethane): ?>
-            <span class="status-badge" style="background:<?= $statusColor[$latestMethane['status']] ?>22; color:<?= $statusColor[$latestMethane['status']] ?>">
-                <?= $latestMethane['status'] ?>
-            </span>
-            <?php endif; ?>
+              <span class="badge badge-<?= strtolower($latestMethane['status']) ?>"><?= $latestMethane['status'] ?></span>
+            <?php else: echo 'No readings yet'; endif; ?>
+          </div>
         </div>
-        <div class="card">
-            <div class="card-label">Gas Tank Level</div>
-            <div class="card-value"><?= $latestLevel ? number_format($latestLevel['gas_percentage'], 1) : '—' ?></div>
-            <div class="card-unit">% capacity</div>
+        <div class="stat-card fade-up">
+          <span class="stat-icon">🫙</span>
+          <div class="stat-label">Tank Level</div>
+          <div class="stat-value">
+            <?= $latestLevel ? number_format($latestLevel['gas_percentage'],1) : '—' ?>
+            <span class="unit">%</span>
+          </div>
+          <?php if ($latestLevel): ?>
+          <div class="gauge-bar mt-1">
+            <div class="gauge-fill <?= $latestLevel['gas_percentage']<25?'danger':($latestLevel['gas_percentage']<50?'warn':'') ?>"
+                 style="width:<?= min(100,$latestLevel['gas_percentage']) ?>%"></div>
+          </div>
+          <?php endif; ?>
         </div>
-    </div>
+        <div class="stat-card fade-up">
+          <span class="stat-icon">💨</span>
+          <div class="stat-label">Flow Rate</div>
+          <div class="stat-value">
+            <?= $latestGas ? number_format($latestGas['flow_rate'],2) : '—' ?>
+            <span class="unit">L/min</span>
+          </div>
+          <div class="stat-sub">Gas used: <?= $latestGas ? number_format($latestGas['gas_used'],2).'L' : 'N/A' ?></div>
+        </div>
+      </div>
 
-    <!-- Recent Gas Usage -->
-    <div class="section-title">Recent Gas Usage</div>
-    <div class="table-wrap">
-        <table>
-            <thead><tr><th>Flow Rate (m³/hr)</th><th>Gas Used (m³)</th><th>Recorded At</th></tr></thead>
-            <tbody>
-            <?php foreach ($gas as $row): ?>
-            <tr>
-                <td><?= number_format($row['flow_rate'], 2) ?></td>
-                <td><?= number_format($row['gas_used'], 2) ?></td>
-                <td><?= $row['recorded_at'] ?></td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
+      <!-- Recent readings table -->
+      <div class="panel fade-up">
+        <div class="panel-header">
+          <span class="panel-title">📋 My Recent Methane Readings</span>
+          <a href="<?= BASE_URL ?>/app/user/my_readings.php" class="btn btn-secondary btn-sm">View All</a>
+        </div>
+        <div class="panel-body">
+          <?php
+          $recent = $db->prepare("SELECT * FROM methane_monitoring WHERE user_id=:u ORDER BY recorded_at DESC LIMIT 8");
+          $recent->execute([':u'=>$uid]);
+          $rows = $recent->fetchAll();
+          ?>
+          <?php if ($rows): ?>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Methane (ppm)</th>
+                  <th>Status</th>
+                  <th>Recorded At</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($rows as $r): ?>
+                <tr>
+                  <td class="mono text-muted text-sm"><?= $r['id'] ?></td>
+                  <td class="mono"><?= number_format($r['methane_ppm'],2) ?></td>
+                  <td><span class="badge badge-<?= strtolower($r['status']) ?>"><?= $r['status'] ?></span></td>
+                  <td class="text-muted text-sm"><?= $r['recorded_at'] ?></td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+          <?php else: ?>
+          <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <p>No readings yet. <a href="<?= BASE_URL ?>/app/user/log_reading.php">Log your first reading →</a></p>
+          </div>
+          <?php endif; ?>
+        </div>
+      </div>
 
-    <!-- Methane Status -->
-    <div class="section-title">Recent Methane Readings</div>
-    <div class="table-wrap">
-        <table>
-            <thead><tr><th>Methane (ppm)</th><th>Status</th><th>Recorded At</th></tr></thead>
-            <tbody>
-            <?php foreach ($methane as $row): ?>
-            <tr>
-                <td><?= number_format($row['methane_ppm']) ?></td>
-                <td>
-                    <span class="status-badge" style="background:<?= $statusColor[$row['status']] ?>22;color:<?= $statusColor[$row['status']] ?>">
-                        <?= $row['status'] ?>
-                    </span>
-                </td>
-                <td><?= $row['recorded_at'] ?></td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</main>
+    </div><!-- /page-body -->
+  </div><!-- /main-content -->
+</div>
 
-</body>
-</html>
+<script>
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleString('en-PH', {
+    dateStyle: 'medium', timeStyle: 'short'
+  });
+}
+updateClock();
+setInterval(updateClock, 30000);
+</script>
+
+<?php renderFoot(); ?>

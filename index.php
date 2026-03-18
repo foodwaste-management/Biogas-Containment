@@ -1,244 +1,190 @@
 <?php
+// ============================================================
+// BCMS — LOGIN PAGE (index.php)
+// ============================================================
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/functions.php';
-
-$error = '';
+require_once __DIR__ . '/includes/activity_logger.php';
 
 // Already logged in → redirect
 if (isLoggedIn()) {
-    $role = $_SESSION['role'];
-    header("Location: /app/$role/dashboard.php");
-    exit;
+    redirect(BASE_URL . '/app/' . $_SESSION['role'] . '/dashboard.php');
 }
+
+$error = '';
+$msg   = e($_GET['msg'] ?? '');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email    = trim($_POST['email']    ?? '');
     $password = trim($_POST['password'] ?? '');
 
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND verified = 1");
-    $stmt->execute([$email]);
-    $user = $stmt->fetch();
-
-    if ($user && password_verify($password, $user['password'])) {
-        $_SESSION['user_id'] = $user['user_id'];
-        $_SESSION['email']   = $user['email'];
-        $_SESSION['role']    = $user['role'];
-
-        logActivity($pdo, $user['user_id'], $user['email'], 'User logged in', 'login');
-
-        header("Location: /app/{$user['role']}/dashboard.php");
-        exit;
+    if (!$email || !$password) {
+        $error = 'Please enter your email and password.';
     } else {
-        logActivity($pdo, null, $email, 'Failed login attempt', 'login_failed');
-        $error = "Wrong email/password or account not verified.";
+        try {
+            $db   = getDB();
+            $stmt = $db->prepare("SELECT * FROM users WHERE email = :email AND verified = 1 LIMIT 1");
+            $stmt->execute([':email' => $email]);
+            $user = $stmt->fetch();
+
+            if ($user && password_verify($password, $user['password'])) {
+                $_SESSION['user_id'] = $user['user_id'];
+                $_SESSION['email']   = $user['email'];
+                $_SESSION['role']    = $user['role'];
+
+                logActivity('User logged in', 'login', $user['user_id'], $user['email']);
+                redirect(BASE_URL . '/app/' . $user['role'] . '/dashboard.php');
+            } else {
+                $error = 'Invalid email or password.';
+                logActivity('Failed login attempt for: ' . $email, 'login', null, $email);
+            }
+        } catch (PDOException $e) {
+            $error = 'A system error occurred. Please try again.';
+            error_log('[BCMS Login] ' . $e->getMessage());
+        }
     }
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BCMS — Login</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — <?= APP_NAME ?></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="<?= BASE_URL ?>/assets/styles.css">
+  <style>
+    /* Extra login-page decorative elements */
+    .login-left {
+      display: none;
+      flex: 1;
+      background: var(--green-900);
+      position: relative;
+      overflow: hidden;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+    @media(min-width:900px){ .login-left{ display:flex; } }
 
-:root {
-    --green:    #2ecc71;
-    --green-dk: #27ae60;
-    --dark:     #0f1a12;
-    --card:     #172419;
-    --border:   #2a3d2d;
-    --text:     #d4e6d7;
-    --muted:    #6b8f72;
-    --error:    #e74c3c;
-}
+    .login-left-inner { position: relative; z-index: 1; text-align: center; }
+    .login-left h2 {
+      font-family: var(--font-serif);
+      font-size: 2.4rem;
+      color: #fff;
+      line-height: 1.2;
+      margin-bottom: 16px;
+    }
+    .login-left p { color: var(--green-300); font-size: .95rem; max-width: 340px; line-height: 1.7; }
 
-body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--dark);
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
-}
+    /* organic blobs */
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      opacity: .12;
+      background: var(--green-400);
+    }
+    .blob-1 { width:300px;height:300px; top:-80px; left:-80px; }
+    .blob-2 { width:200px;height:200px; bottom:-50px; right:-50px; }
+    .blob-3 { width:120px;height:120px; top:40%; right:20%; }
 
-/* animated background grid */
-body::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
-    background-size: 40px 40px;
-    opacity: 0.4;
-}
-
-body::after {
-    content: '';
-    position: absolute;
-    width: 500px; height: 500px;
-    background: radial-gradient(circle, rgba(46,204,113,0.12) 0%, transparent 70%);
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-}
-
-.card {
-    position: relative;
-    z-index: 1;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 48px 40px;
-    width: 100%;
-    max-width: 420px;
-    box-shadow: 0 24px 64px rgba(0,0,0,0.5);
-}
-
-.logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 32px;
-}
-
-.logo-icon {
-    width: 36px; height: 36px;
-    background: var(--green);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-}
-
-.logo-text {
-    font-family: 'Space Mono', monospace;
-    font-size: 18px;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: -0.5px;
-}
-
-.logo-text span { color: var(--green); }
-
-h2 {
-    font-size: 22px;
-    font-weight: 500;
-    color: #fff;
-    margin-bottom: 6px;
-}
-
-.subtitle {
-    font-size: 13px;
-    color: var(--muted);
-    margin-bottom: 28px;
-}
-
-.form-group { margin-bottom: 16px; }
-
-label {
-    display: block;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin-bottom: 6px;
-}
-
-input[type="email"],
-input[type="password"] {
-    width: 100%;
-    padding: 12px 14px;
-    background: var(--dark);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
-    transition: border-color 0.2s;
-    outline: none;
-}
-
-input:focus { border-color: var(--green); }
-
-.btn {
-    width: 100%;
-    padding: 13px;
-    background: var(--green);
-    color: #0f1a12;
-    border: none;
-    border-radius: 8px;
-    font-family: 'Space Mono', monospace;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    letter-spacing: 0.5px;
-    transition: background 0.2s, transform 0.1s;
-    margin-top: 8px;
-}
-
-.btn:hover  { background: var(--green-dk); }
-.btn:active { transform: scale(0.98); }
-
-.error-msg {
-    background: rgba(231,76,60,0.1);
-    border: 1px solid rgba(231,76,60,0.3);
-    color: var(--error);
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-size: 13px;
-    margin-bottom: 18px;
-}
-
-.hint {
-    margin-top: 24px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border);
-    font-size: 12px;
-    color: var(--muted);
-    line-height: 1.8;
-}
-
-.hint strong { color: var(--text); }
-</style>
+    .login-features { margin-top: 36px; display:flex; flex-direction:column; gap:12px; }
+    .login-feature {
+      display:flex; align-items:center; gap:12px;
+      background:rgba(255,255,255,.07);
+      border-radius:10px; padding:12px 16px; text-align:left;
+    }
+    .login-feature-icon { font-size:1.4rem; }
+    .login-feature-text { color:rgba(255,255,255,.85); font-size:.85rem; line-height:1.4; }
+    .login-feature-text strong { color:#fff; display:block; font-size:.9rem; }
+  </style>
 </head>
-<body>
-<div class="card">
-    <div class="logo">
-        <div class="logo-icon">🌿</div>
-        <div class="logo-text">BC<span>MS</span></div>
-    </div>
+<body class="login-page">
 
-    <h2>Welcome back</h2>
-    <p class="subtitle">Biogas & Composting Monitoring System</p>
+  <!-- Left decorative panel -->
+  <div class="login-left">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="login-left-inner fade-up">
+      <div style="font-size:3.5rem;margin-bottom:16px;">🫧</div>
+      <h2>Biogas Containment<br><em>Monitoring System</em></h2>
+      <p>Real-time tracking of methane levels, gas flow rates, and containment integrity for safer biogas operations.</p>
 
-    <?php if ($error): ?>
-    <div class="error-msg"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
-
-    <form method="POST">
-        <div class="form-group">
-            <label>Email</label>
-            <input type="email" name="email" required autocomplete="email">
+      <div class="login-features stagger">
+        <div class="login-feature fade-up">
+          <span class="login-feature-icon">📊</span>
+          <div class="login-feature-text">
+            <strong>Gas Usage Monitoring</strong>
+            Track flow rate and total gas consumed.
+          </div>
         </div>
-        <div class="form-group">
-            <label>Password</label>
-            <input type="password" name="password" required autocomplete="current-password">
+        <div class="login-feature fade-up">
+          <span class="login-feature-icon">⚠️</span>
+          <div class="login-feature-text">
+            <strong>Methane Leak Detection</strong>
+            Automated SAFE / WARNING / LEAK alerts.
+          </div>
         </div>
-        <button type="submit" class="btn">Sign In →</button>
-    </form>
-
-    <div class="hint">
-        <strong>Test accounts</strong><br>
-        admin@example.com &nbsp;|&nbsp; manager@example.com &nbsp;|&nbsp; user@example.com<br>
-        Password: <em>password123</em>
+        <div class="login-feature fade-up">
+          <span class="login-feature-icon">🫙</span>
+          <div class="login-feature-text">
+            <strong>Gas Level &amp; Pressure</strong>
+            Monitor tank percentage and kPa readings.
+          </div>
+        </div>
+      </div>
     </div>
-</div>
+  </div>
+
+  <!-- Right login form -->
+  <div class="login-panel">
+    <div class="login-card fade-up">
+      <div class="login-brand">
+        <div class="login-brand-icon">🫧</div>
+        <div>
+          <h1><?= APP_NAME ?></h1>
+          <p><?= APP_SHORT ?> v<?= APP_VERSION ?></p>
+        </div>
+      </div>
+
+      <h2>Welcome back</h2>
+      <p class="subtitle">Sign in to access your monitoring dashboard.</p>
+
+      <?php if ($msg):  ?>
+        <div class="alert alert-info"><?= $msg ?></div>
+      <?php endif; ?>
+
+      <?php if ($error): ?>
+        <div class="alert alert-error"><?= e($error) ?></div>
+      <?php endif; ?>
+
+      <form method="POST" action="">
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" name="email"
+                 placeholder="you@example.com"
+                 value="<?= isset($email) ? e($email) : '' ?>"
+                 required autofocus>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password"
+                 placeholder="••••••••" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full">
+          Sign In →
+        </button>
+      </form>
+
+      <p style="margin-top:24px;font-size:.78rem;color:var(--text-muted);text-align:center;">
+        Default credentials: <span class="mono">admin@bcms.io / password123</span>
+      </p>
+    </div>
+  </div>
+
 </body>
 </html>
