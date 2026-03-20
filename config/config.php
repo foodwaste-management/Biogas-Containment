@@ -5,6 +5,14 @@
 // ============================================================
 
 // Session bootstrap
+
+//  mark - I removed the Fail connection indicator
+//
+//
+//
+//
+//
+//
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }

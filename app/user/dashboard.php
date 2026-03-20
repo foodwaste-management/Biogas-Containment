@@ -26,11 +26,11 @@ $latestLevel = $level->fetch();
 
 // Count submissions
 $countStmt = $db->prepare("SELECT
-  (SELECT COUNT(*) FROM gas_usage          WHERE user_id=:u) as gas_count,
-  (SELECT COUNT(*) FROM methane_monitoring WHERE user_id=:u) as meth_count,
-  (SELECT COUNT(*) FROM gas_level          WHERE user_id=:u) as lvl_count
+  (SELECT COUNT(*) FROM gas_usage          WHERE user_id=:u1) as gas_count,
+  (SELECT COUNT(*) FROM methane_monitoring WHERE user_id=:u2) as meth_count,
+  (SELECT COUNT(*) FROM gas_level          WHERE user_id=:u3) as lvl_count
 ");
-$countStmt->execute([':u'=>$uid]);
+$countStmt->execute([':u1' => $uid, ':u2' => $uid, ':u3' => $uid]);
 $counts = $countStmt->fetch();
 
 $pageTitle = 'My Dashboard';
