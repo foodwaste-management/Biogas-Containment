@@ -23,14 +23,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             $db   = getDB();
-            $stmt = $db->prepare("SELECT * FROM users WHERE email = :email AND verified = 1 LIMIT 1");
+            // ── CHANGE: added display_name to SELECT (was SELECT *) ──
+            $stmt = $db->prepare("SELECT user_id, email, display_name, password, role, verified FROM users WHERE email = :email AND verified = 1 LIMIT 1");
             $stmt->execute([':email' => $email]);
             $user = $stmt->fetch();
 
             if ($user && password_verify($password, $user['password'])) {
-                $_SESSION['user_id'] = $user['user_id'];
-                $_SESSION['email']   = $user['email'];
-                $_SESSION['role']    = $user['role'];
+                session_regenerate_id(true); // prevent session fixation
+
+                // ── CHANGE: added display_name to session ──
+                $_SESSION['user_id']      = $user['user_id'];
+                $_SESSION['email']        = $user['email'];
+                $_SESSION['display_name'] = $user['display_name']; // ← NEW
+                $_SESSION['role']         = $user['role'];
 
                 logActivity('User logged in', 'login', $user['user_id'], $user['email']);
                 redirect(BASE_URL . '/app/' . $user['role'] . '/dashboard.php');
@@ -55,7 +60,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>/assets/styles.css">
   <style>
-    /* Extra login-page decorative elements */
     .login-left {
       display: none;
       flex: 1;
@@ -78,7 +82,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     .login-left p { color: var(--green-300); font-size: .95rem; max-width: 340px; line-height: 1.7; }
 
-    /* organic blobs */
     .blob {
       position: absolute;
       border-radius: 50%;
@@ -102,7 +105,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="login-page">
 
-  <!-- Left decorative panel -->
   <div class="login-left">
     <div class="blob blob-1"></div>
     <div class="blob blob-2"></div>
@@ -138,7 +140,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
   </div>
 
-  <!-- Right login form -->
   <div class="login-panel">
     <div class="login-card fade-up">
       <div class="login-brand">
@@ -152,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <h2>Welcome back</h2>
       <p class="subtitle">Sign in to access your monitoring dashboard.</p>
 
-      <?php if ($msg):  ?>
+      <?php if ($msg): ?>
         <div class="alert alert-info"><?= $msg ?></div>
       <?php endif; ?>
 
