@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../config/functions.php';
 require_once __DIR__ . '/../../includes/activity_logger.php';
 requireRole('manager');
 
-$db   = getDB();
+$db = getDB();
 $logs = getRecentActivity(100);
 $pageTitle = 'Activity Log';
 renderHead($pageTitle);
@@ -12,25 +12,38 @@ renderHead($pageTitle);
 <div class="layout">
   <?php require_once __DIR__ . '/../../includes/sidebar.php'; ?>
   <div class="main-content">
-    <div class="topbar"><div class="topbar-title">📝 Activity Log</div></div>
+    <div class="topbar">
+      <div class="topbar-title">Activity Log</div>
+    </div>
     <div class="page-body">
       <div class="panel fade-up">
         <div class="panel-header"><span class="panel-title">Recent Activity</span></div>
         <div class="panel-body">
           <div class="table-wrap">
             <table class="data-table">
-              <thead><tr><th>User</th><th>Activity</th><th>Type</th><th>IP</th><th>Time</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Activity</th>
+                  <th>Type</th>
+                  <th>IP</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
               <tbody>
                 <?php foreach ($logs as $l): ?>
-                <tr>
-                  <td class="text-sm"><?= e($l['email']??'System') ?></td>
-                  <td class="text-sm"><?= e($l['activity']) ?></td>
-                  <td><span class="badge badge-<?= $l['activity_type'] ?>"><?= $l['activity_type'] ?></span></td>
-                  <td class="mono text-sm text-muted"><?= e($l['ip_address']??'') ?></td>
-                  <td class="text-sm text-muted"><?= $l['created_at'] ?></td>
-                </tr>
+                  <tr>
+                    <td class="text-sm"><?= e($l['email'] ?? 'System') ?></td>
+                    <td class="text-sm"><?= e($l['activity']) ?></td>
+                    <td><span class="badge badge-<?= $l['activity_type'] ?>"><?= $l['activity_type'] ?></span></td>
+                    <td class="mono text-sm text-muted"><?= e($l['ip_address'] ?? '') ?></td>
+                    <td class="text-sm text-muted"><?= $l['created_at'] ?></td>
+                  </tr>
                 <?php endforeach; ?>
-                <?php if (!$logs): ?><tr><td colspan="5" class="text-center text-muted" style="padding:32px">No activity yet.</td></tr><?php endif; ?>
+                <?php if (!$logs): ?>
+                  <tr>
+                    <td colspan="5" class="text-center text-muted" style="padding:32px">No activity yet.</td>
+                  </tr><?php endif; ?>
               </tbody>
             </table>
           </div>
