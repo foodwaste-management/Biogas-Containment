@@ -514,7 +514,6 @@ $gas_class = $gas_left < 20 ? 'status-danger' : ($gas_left < 40 ? 'status-warn' 
             Menu</div>
         <nav class="sidebar-nav">
             <a href="dashboard.php" class="active">Dashboard</a>
-            <a href="log_reading.php">Log Reading</a>
             <a href="my_readings.php">My Readings</a>
         </nav>
     </aside>
