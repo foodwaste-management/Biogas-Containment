@@ -122,6 +122,100 @@ $gas_class = $gas_left < 20 ? 'status-danger' : ($gas_left < 40 ? 'status-warn' 
             gap: 10px;
         }
 
+        .btn-toggle {
+            background: none;
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+            color: #4a5568;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        .btn-toggle:hover {
+            background: #f5f0e8;
+        }
+
+        /* ── Sidebar ── */
+        .user-sidebar {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 260px;
+            height: 100vh;
+            background: #ffffff;
+            border-right: 1px solid #e2d9c8;
+            box-shadow: 2px 0 12px rgba(0, 0, 0, 0.08);
+            z-index: 200;
+            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-sidebar.open {
+            left: 0;
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 150;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .sidebar-overlay.open {
+            display: block;
+            opacity: 1;
+        }
+
+        .sidebar-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            align-self: flex-end;
+            color: #a0aec0;
+            margin-bottom: 20px;
+            padding: 4px;
+        }
+
+        .sidebar-close:hover {
+            color: #4a5568;
+        }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .sidebar-nav a {
+            text-decoration: none;
+            color: #4a5568;
+            font-weight: 500;
+            font-size: 15px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .sidebar-nav a:hover,
+        .sidebar-nav a.active {
+            background: #f0fdf4;
+            color: #16a34a;
+        }
+
         .header-left h1 {
             font-size: 16px;
             font-weight: 700;
@@ -383,10 +477,26 @@ $gas_class = $gas_left < 20 ? 'status-danger' : ($gas_left < 40 ? 'status-warn' 
 
 <body>
 
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="user-sidebar" id="user-sidebar">
+        <button class="sidebar-close" id="sidebar-close">✕</button>
+        <div style="font-weight: 700; font-size: 18px; margin-bottom: 24px; color: #1a202c; padding-left: 10px;">BCMS
+            Menu</div>
+        <nav class="sidebar-nav">
+            <a href="dashboard.php" class="active">Dashboard</a>
+            <a href="log_reading.php">Log Reading</a>
+            <a href="my_readings.php">My Readings</a>
+        </nav>
+    </aside>
+
     <!-- Header -->
     <header class="header">
         <div class="header-left">
-            <div class="live-dot"></div>
+            <button class="btn-toggle" id="btn-toggle">☰</button>
+            <div class="live-dot" style="margin-left: 8px;"></div>
             <h1>Biogas Containment Monitoring System Dashboard</h1>
         </div>
         <div class="header-right">
@@ -458,6 +568,29 @@ $gas_class = $gas_left < 20 ? 'status-danger' : ($gas_left < 40 ? 'status-warn' 
     </main>
 
     <script>
+        // ── Sidebar Toggle ────────────────────────────────────────────────
+        const sidebar = document.getElementById('user-sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        const btnToggle = document.getElementById('btn-toggle');
+        const btnClose = document.getElementById('sidebar-close');
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+            if (sidebar.classList.contains('open')) {
+                overlay.style.display = 'block';
+                // Trigger reflow
+                void overlay.offsetWidth;
+                overlay.classList.add('open');
+            } else {
+                overlay.classList.remove('open');
+                setTimeout(() => overlay.style.display = 'none', 300);
+            }
+        }
+
+        btnToggle.addEventListener('click', toggleSidebar);
+        btnClose.addEventListener('click', toggleSidebar);
+        overlay.addEventListener('click', toggleSidebar);
+
         // ── Gauge arcs ────────────────────────────────────────────────────
         (function () {
             const arcLen = Math.PI * 80;
