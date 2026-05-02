@@ -113,7 +113,7 @@ function renderHead(string $title, string $extraCss = ''): void
             echo $extraCss; ?>
     </head>
 
-    <body>
+    <body class="<?= currentRole() ?>-theme">
         <?php
 }
 
