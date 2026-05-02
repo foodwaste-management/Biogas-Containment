@@ -19,12 +19,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
   }
 }
 
-$rows = $db->query("
-    SELECT g.*, u.email
-    FROM gas_level g
-    LEFT JOIN users u ON g.user_id = u.user_id
-    ORDER BY g.recorded_at DESC
-")->fetchAll();
+$start_date = $_GET['start_date'] ?? '';
+$end_date = $_GET['end_date'] ?? '';
+
+$where = '';
+$params = [];
+if ($start_date && $end_date) {
+  $where = 'WHERE DATE(g.recorded_at) >= :start AND DATE(g.recorded_at) <= :end';
+  $params = ['start' => $start_date, 'end' => $end_date];
+} elseif ($start_date) {
+  $where = 'WHERE DATE(g.recorded_at) >= :start';
+  $params = ['start' => $start_date];
+} elseif ($end_date) {
+  $where = 'WHERE DATE(g.recorded_at) <= :end';
+  $params = ['end' => $end_date];
+}
+
+$sql = "SELECT g.*, u.email FROM gas_level g LEFT JOIN users u ON g.user_id = u.user_id $where ORDER BY g.recorded_at DESC";
+
+if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+  $filename = "admin_gas_level_" . date('Ymd_His') . ".csv";
+  header("Content-Type: text/csv");
+  header("Content-Disposition: attachment; filename=\"$filename\"");
+  $out = fopen('php://output', 'w');
+  fputcsv($out, ['ID', 'User', 'Pressure (kPa)', 'Tank Fill (%)', 'Recorded At']);
+  $stmt = $db->prepare($sql);
+  $stmt->execute($params);
+  while ($r = $stmt->fetch()) {
+    fputcsv($out, [$r['id'], $r['email'] ?? 'Deleted User', $r['pressure_kpa'], $r['gas_percentage'], $r['recorded_at']]);
+  }
+  fclose($out);
+  exit;
+}
+
+$stmt = $db->prepare($sql);
+$stmt->execute($params);
+$rows = $stmt->fetchAll();
 
 $agg = $db->query("SELECT
     AVG(pressure_kpa)   as avg_kpa,
@@ -82,6 +112,18 @@ renderHead($pageTitle);
       <div class="panel fade-up">
         <div class="panel-header">
           <span class="panel-title">All Gas Level Readings</span>
+          <div class="flex gap-2 items-center">
+            <form method="GET" class="flex gap-2 items-center" style="margin:0;">
+              <input type="date" name="start_date" value="<?= e($start_date) ?>" class="form-control btn-sm"
+                style="padding:4px 8px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:var(--font-sans);font-size:.8rem;background:var(--surface);">
+              <span class="text-sm text-muted">to</span>
+              <input type="date" name="end_date" value="<?= e($end_date) ?>" class="form-control btn-sm"
+                style="padding:4px 8px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:var(--font-sans);font-size:.8rem;background:var(--surface);">
+              <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+            </form>
+            <?php $exportUrl = "?start_date=" . urlencode($start_date) . "&end_date=" . urlencode($end_date) . "&export=csv"; ?>
+            <a href="<?= $exportUrl ?>" class="btn btn-secondary btn-sm">Export CSV</a>
+          </div>
         </div>
         <div class="panel-body">
           <div class="table-wrap">

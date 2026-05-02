@@ -64,7 +64,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-$users = $db->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll();
+$start_date = $_GET['start_date'] ?? '';
+$end_date = $_GET['end_date'] ?? '';
+
+$where = '';
+$params = [];
+if ($start_date && $end_date) {
+  $where = 'WHERE DATE(created_at) >= :start AND DATE(created_at) <= :end';
+  $params = ['start' => $start_date, 'end' => $end_date];
+} elseif ($start_date) {
+  $where = 'WHERE DATE(created_at) >= :start';
+  $params = ['start' => $start_date];
+} elseif ($end_date) {
+  $where = 'WHERE DATE(created_at) <= :end';
+  $params = ['end' => $end_date];
+}
+
+$sql = "SELECT * FROM users $where ORDER BY created_at DESC";
+
+if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+  $filename = "admin_users_" . date('Ymd_His') . ".csv";
+  header("Content-Type: text/csv");
+  header("Content-Disposition: attachment; filename=\"$filename\"");
+  $out = fopen('php://output', 'w');
+  fputcsv($out, ['ID', 'Email', 'Role', 'Verified', 'Created At']);
+  $stmt = $db->prepare($sql);
+  $stmt->execute($params);
+  while ($r = $stmt->fetch()) {
+    fputcsv($out, [$r['user_id'], $r['email'], $r['role'], $r['verified'] ? 'Yes' : 'No', $r['created_at']]);
+  }
+  fclose($out);
+  exit;
+}
+
+$stmt = $db->prepare($sql);
+$stmt->execute($params);
+$users = $stmt->fetchAll();
 
 $pageTitle = 'User Management';
 renderHead($pageTitle);
@@ -126,6 +161,18 @@ renderHead($pageTitle);
       <div class="panel fade-up">
         <div class="panel-header">
           <span class="panel-title">Registered Users (<?= count($users) ?>)</span>
+          <div class="flex gap-2 items-center">
+            <form method="GET" class="flex gap-2 items-center" style="margin:0;">
+              <input type="date" name="start_date" value="<?= e($start_date) ?>" class="form-control btn-sm"
+                style="padding:4px 8px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:var(--font-sans);font-size:.8rem;background:var(--surface);">
+              <span class="text-sm text-muted">to</span>
+              <input type="date" name="end_date" value="<?= e($end_date) ?>" class="form-control btn-sm"
+                style="padding:4px 8px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:var(--font-sans);font-size:.8rem;background:var(--surface);">
+              <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+            </form>
+            <?php $exportUrl = "?start_date=" . urlencode($start_date) . "&end_date=" . urlencode($end_date) . "&export=csv"; ?>
+            <a href="<?= $exportUrl ?>" class="btn btn-secondary btn-sm">Export CSV</a>
+          </div>
         </div>
         <div class="panel-body">
           <div class="table-wrap">
