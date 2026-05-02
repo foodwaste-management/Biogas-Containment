@@ -82,6 +82,25 @@ body.admin-theme {
   --leak: #c0392b;
 }
 
+/* ── Manager Theme (Blue) ────────────────────────────────────── */
+body.manager-theme {
+  /* Blues replacing Greens */
+  --green-900: #0e1a2e;
+  --green-800: #15284a;
+  --green-700: #1a3a5f;
+  --green-600: #22517c;
+  --green-500: #286896;
+  --green-400: #3884b5;
+  --green-300: #54a5cc;
+  --green-200: #88c8e3;
+  --green-100: #c2e2f3;
+  --green-50: #e6f3fa;
+
+  --safe: #4a7c3f;
+  --warning: #b8860b;
+  --leak: #c0392b;
+}
+
 /* ── Reset ─────────────────────────────────────────────────── */
 *,
 *::before,
