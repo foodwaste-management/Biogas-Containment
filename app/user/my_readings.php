@@ -6,31 +6,80 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$conn = new mysqli("localhost", "root", "", "foodwaste_db");
+$db = new PDO("mysql:host=localhost;dbname=foodwaste_db;charset=utf8", "root", "");
+$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
 $user_id = (int) $_SESSION['user_id'];
 $email = $_SESSION['email'] ?? 'user@example.com';
 
-// Fetch Methane Logs
-$methane_logs = [];
-$r1 = $conn->query("SELECT methane_ppm, status, recorded_at FROM methane_monitoring WHERE user_id = $user_id ORDER BY recorded_at DESC LIMIT 100");
-if ($r1) {
-    while ($row = $r1->fetch_assoc()) $methane_logs[] = $row;
+$start_date = $_GET['start_date'] ?? '';
+$end_date = $_GET['end_date'] ?? '';
+
+$where = 'WHERE user_id = :uid';
+$params = [':uid' => $user_id];
+
+if ($start_date && $end_date) {
+    $where .= ' AND DATE(recorded_at) >= :start AND DATE(recorded_at) <= :end';
+    $params[':start'] = $start_date;
+    $params[':end'] = $end_date;
+} elseif ($start_date) {
+    $where .= ' AND DATE(recorded_at) >= :start';
+    $params[':start'] = $start_date;
+} elseif ($end_date) {
+    $where .= ' AND DATE(recorded_at) <= :end';
+    $params[':end'] = $end_date;
 }
+
+// ── EXPORT CSV LOGIC ──
+if (isset($_GET['export'])) {
+    $type = $_GET['export'];
+    $out = fopen('php://output', 'w');
+    
+    if ($type === 'methane') {
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="my_methane_readings_' . date('Ymd') . '.csv"');
+        fputcsv($out, ['Recorded At', 'Methane (ppm)', 'Status']);
+        $stmt = $db->prepare("SELECT recorded_at, methane_ppm, status FROM methane_monitoring $where ORDER BY recorded_at DESC");
+        $stmt->execute($params);
+        while ($r = $stmt->fetch()) fputcsv($out, [$r['recorded_at'], $r['methane_ppm'], $r['status']]);
+        fclose($out);
+        exit;
+    } elseif ($type === 'usage') {
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="my_gas_usage_' . date('Ymd') . '.csv"');
+        fputcsv($out, ['Recorded At', 'Flow Rate (m3/h)', 'Gas Used (L)']);
+        $stmt = $db->prepare("SELECT recorded_at, flow_rate, gas_used FROM gas_usage $where ORDER BY recorded_at DESC");
+        $stmt->execute($params);
+        while ($r = $stmt->fetch()) fputcsv($out, [$r['recorded_at'], $r['flow_rate'], $r['gas_used']]);
+        fclose($out);
+        exit;
+    } elseif ($type === 'level') {
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="my_gas_levels_' . date('Ymd') . '.csv"');
+        fputcsv($out, ['Recorded At', 'Gas Percentage (%)']);
+        $stmt = $db->prepare("SELECT recorded_at, gas_percentage FROM gas_level $where ORDER BY recorded_at DESC");
+        $stmt->execute($params);
+        while ($r = $stmt->fetch()) fputcsv($out, [$r['recorded_at'], $r['gas_percentage']]);
+        fclose($out);
+        exit;
+    }
+}
+
+// Fetch Methane Logs
+$stmt1 = $db->prepare("SELECT methane_ppm, status, recorded_at FROM methane_monitoring $where ORDER BY recorded_at DESC LIMIT 200");
+$stmt1->execute($params);
+$methane_logs = $stmt1->fetchAll();
 
 // Fetch Gas Usage Logs
-$usage_logs = [];
-$r2 = $conn->query("SELECT flow_rate, gas_used, recorded_at FROM gas_usage WHERE user_id = $user_id ORDER BY recorded_at DESC LIMIT 100");
-if ($r2) {
-    while ($row = $r2->fetch_assoc()) $usage_logs[] = $row;
-}
+$stmt2 = $db->prepare("SELECT flow_rate, gas_used, recorded_at FROM gas_usage $where ORDER BY recorded_at DESC LIMIT 200");
+$stmt2->execute($params);
+$usage_logs = $stmt2->fetchAll();
 
 // Fetch Gas Level Logs
-$level_logs = [];
-$r3 = $conn->query("SELECT gas_percentage, recorded_at FROM gas_level WHERE user_id = $user_id ORDER BY recorded_at DESC LIMIT 100");
-if ($r3) {
-    while ($row = $r3->fetch_assoc()) $level_logs[] = $row;
-}
+$stmt3 = $db->prepare("SELECT gas_percentage, recorded_at FROM gas_level $where ORDER BY recorded_at DESC LIMIT 200");
+$stmt3->execute($params);
+$level_logs = $stmt3->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -69,7 +118,16 @@ if ($r3) {
         /* Container & Cards */
         .container { max-width: 1100px; margin: 0 auto; padding: 28px 24px; }
         .card { background: #ffffff; border: 1px solid #e2d9c8; border-radius: 12px; padding: 24px; transition: box-shadow 0.2s ease; margin-bottom: 22px; }
-        .card-title { font-size: 14px; font-weight: 700; color: #1a202c; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; }
+        .card-title { font-size: 14px; font-weight: 700; color: #1a202c; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+
+        /* Filter Form */
+        .filter-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .filter-input { font-family: 'Inter', sans-serif; font-size: 13px; padding: 6px 10px; border: 1px solid #e2d9c8; border-radius: 6px; color: #4a5568; outline: none; }
+        .filter-input:focus { border-color: #16a34a; }
+        .btn-filter { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; padding: 7px 14px; background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
+        .btn-filter:hover { background: #dcfce7; }
+        .btn-export { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; padding: 6px 12px; background: #ffffff; color: #4a5568; border: 1px solid #e2d9c8; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; transition: background 0.2s; }
+        .btn-export:hover { background: #f5f0e8; }
 
         /* Tabs */
         .tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid #e2d9c8; padding-bottom: 8px; }
@@ -132,7 +190,18 @@ if ($r3) {
     <!-- Main -->
     <main class="container">
         <div class="card">
-            <div class="card-title">Sensor Activity Logs</div>
+            <div class="card-title">
+                <span>Sensor Activity Logs</span>
+                <form class="filter-form" method="GET">
+                    <input type="date" name="start_date" class="filter-input" value="<?= htmlspecialchars($start_date) ?>">
+                    <span style="color:#a0aec0;font-size:13px;">to</span>
+                    <input type="date" name="end_date" class="filter-input" value="<?= htmlspecialchars($end_date) ?>">
+                    <button type="submit" class="btn-filter">Filter</button>
+                    <?php if ($start_date || $end_date): ?>
+                        <a href="my_readings.php" class="btn-export" style="color:#dc2626;border-color:#fecaca;">Clear</a>
+                    <?php endif; ?>
+                </form>
+            </div>
             
             <div class="tabs">
                 <button class="tab-btn active" onclick="openTab('tab-methane', this)">Methane Readings</button>
@@ -142,6 +211,9 @@ if ($r3) {
 
             <!-- Methane Tab -->
             <div id="tab-methane" class="tab-content active">
+                <div style="margin-bottom: 14px; text-align: right;">
+                    <a href="my_readings.php?export=methane&start_date=<?= urlencode($start_date) ?>&end_date=<?= urlencode($end_date) ?>" class="btn-export">↓ Export CSV</a>
+                </div>
                 <div class="table-wrap">
                     <table class="data-table">
                         <thead>
@@ -176,6 +248,9 @@ if ($r3) {
 
             <!-- Usage Tab -->
             <div id="tab-usage" class="tab-content">
+                <div style="margin-bottom: 14px; text-align: right;">
+                    <a href="my_readings.php?export=usage&start_date=<?= urlencode($start_date) ?>&end_date=<?= urlencode($end_date) ?>" class="btn-export">↓ Export CSV</a>
+                </div>
                 <div class="table-wrap">
                     <table class="data-table">
                         <thead>
@@ -204,6 +279,9 @@ if ($r3) {
 
             <!-- Level Tab -->
             <div id="tab-level" class="tab-content">
+                <div style="margin-bottom: 14px; text-align: right;">
+                    <a href="my_readings.php?export=level&start_date=<?= urlencode($start_date) ?>&end_date=<?= urlencode($end_date) ?>" class="btn-export">↓ Export CSV</a>
+                </div>
                 <div class="table-wrap">
                     <table class="data-table">
                         <thead>
