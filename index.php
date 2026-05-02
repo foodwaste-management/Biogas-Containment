@@ -170,28 +170,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="blob blob-2"></div>
     <div class="blob blob-3"></div>
     <div class="login-left-inner fade-up">
-      <div style="font-size:3.5rem;margin-bottom:16px;">🫧</div>
+      <div style="font-size:3.5rem;margin-bottom:16px;"></div>
       <h2>Biogas Containment<br><em>Monitoring System</em></h2>
       <p>Real-time tracking of methane levels, gas flow rates, and containment integrity for safer biogas operations.
       </p>
 
       <div class="login-features stagger">
         <div class="login-feature fade-up">
-          <span class="login-feature-icon">📊</span>
+          <span class="login-feature-icon"></span>
           <div class="login-feature-text">
             <strong>Gas Usage Monitoring</strong>
             Track flow rate and total gas consumed.
           </div>
         </div>
         <div class="login-feature fade-up">
-          <span class="login-feature-icon">⚠️</span>
+          <span class="login-feature-icon"></span>
           <div class="login-feature-text">
             <strong>Methane Leak Detection</strong>
             Automated SAFE / WARNING / LEAK alerts.
           </div>
         </div>
         <div class="login-feature fade-up">
-          <span class="login-feature-icon">🫙</span>
+          <span class="login-feature-icon"></span>
           <div class="login-feature-text">
             <strong>Gas Level &amp; Pressure</strong>
             Monitor tank percentage and kPa readings.
@@ -204,7 +204,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <div class="login-panel">
     <div class="login-card fade-up">
       <div class="login-brand">
-        <div class="login-brand-icon">🫧</div>
+
         <div>
           <h1><?= APP_NAME ?></h1>
           <p><?= APP_SHORT ?> v<?= APP_VERSION ?></p>
