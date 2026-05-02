@@ -8,57 +8,59 @@ require_once __DIR__ . '/includes/activity_logger.php';
 
 // Already logged in → redirect
 if (isLoggedIn()) {
-    redirect(BASE_URL . '/app/' . $_SESSION['role'] . '/dashboard.php');
+  redirect(BASE_URL . '/app/' . $_SESSION['role'] . '/dashboard.php');
 }
 
 $error = '';
-$msg   = e($_GET['msg'] ?? '');
+$msg = e($_GET['msg'] ?? '');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email    = trim($_POST['email']    ?? '');
-    $password = trim($_POST['password'] ?? '');
+  $email = trim($_POST['email'] ?? '');
+  $password = trim($_POST['password'] ?? '');
 
-    if (!$email || !$password) {
-        $error = 'Please enter your email and password.';
-    } else {
-        try {
-            $db   = getDB();
-            // ── CHANGE: added display_name to SELECT (was SELECT *) ──
-            $stmt = $db->prepare("SELECT user_id, email, display_name, password, role, verified FROM users WHERE email = :email AND verified = 1 LIMIT 1");
-            $stmt->execute([':email' => $email]);
-            $user = $stmt->fetch();
+  if (!$email || !$password) {
+    $error = 'Please enter your email and password.';
+  } else {
+    try {
+      $db = getDB();
+      // ── CHANGE: Reverted to original SELECT (display_name removed since it's not in DB) ──
+      $stmt = $db->prepare("SELECT user_id, email, password, role, verified FROM users WHERE email = :email AND verified = 1 LIMIT 1");
+      $stmt->execute([':email' => $email]);
+      $user = $stmt->fetch();
 
-            if ($user && password_verify($password, $user['password'])) {
-                session_regenerate_id(true); // prevent session fixation
+      if ($user && password_verify($password, $user['password'])) {
+        session_regenerate_id(true); // prevent session fixation
 
-                // ── CHANGE: added display_name to session ──
-                $_SESSION['user_id']      = $user['user_id'];
-                $_SESSION['email']        = $user['email'];
-                $_SESSION['display_name'] = $user['display_name']; // ← NEW
-                $_SESSION['role']         = $user['role'];
+        $_SESSION['user_id'] = $user['user_id'];
+        $_SESSION['email'] = $user['email'];
+        $_SESSION['role'] = $user['role'];
 
-                logActivity('User logged in', 'login', $user['user_id'], $user['email']);
-                redirect(BASE_URL . '/app/' . $user['role'] . '/dashboard.php');
-            } else {
-                $error = 'Invalid email or password.';
-                logActivity('Failed login attempt for: ' . $email, 'login', null, $email);
-            }
-        } catch (PDOException $e) {
-            $error = 'A system error occurred. Please try again.';
-            error_log('[BCMS Login] ' . $e->getMessage());
-        }
+        logActivity('User logged in', 'login', $user['user_id'], $user['email']);
+        redirect(BASE_URL . '/app/' . $user['role'] . '/dashboard.php');
+      } else {
+        $error = 'Invalid email or password.';
+        logActivity('Failed login attempt for: ' . $email, 'login', null, $email);
+      }
+    } catch (PDOException $e) {
+      $error = 'A system error occurred. Please try again.';
+      error_log('[BCMS Login] ' . $e->getMessage());
     }
+  }
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login — <?= APP_NAME ?></title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>/assets/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+
   <style>
     .login-left {
       display: none;
@@ -70,9 +72,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       justify-content: center;
       padding: 40px;
     }
-    @media(min-width:900px){ .login-left{ display:flex; } }
 
-    .login-left-inner { position: relative; z-index: 1; text-align: center; }
+    @media(min-width:900px) {
+      .login-left {
+        display: flex;
+      }
+    }
+
+    .login-left-inner {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+    }
+
     .login-left h2 {
       font-family: var(--font-serif);
       font-size: 2.4rem;
@@ -80,7 +92,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       line-height: 1.2;
       margin-bottom: 16px;
     }
-    .login-left p { color: var(--green-300); font-size: .95rem; max-width: 340px; line-height: 1.7; }
+
+    .login-left p {
+      color: var(--green-300);
+      font-size: .95rem;
+      max-width: 340px;
+      line-height: 1.7;
+    }
 
     .blob {
       position: absolute;
@@ -88,21 +106,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       opacity: .12;
       background: var(--green-400);
     }
-    .blob-1 { width:300px;height:300px; top:-80px; left:-80px; }
-    .blob-2 { width:200px;height:200px; bottom:-50px; right:-50px; }
-    .blob-3 { width:120px;height:120px; top:40%; right:20%; }
 
-    .login-features { margin-top: 36px; display:flex; flex-direction:column; gap:12px; }
-    .login-feature {
-      display:flex; align-items:center; gap:12px;
-      background:rgba(255,255,255,.07);
-      border-radius:10px; padding:12px 16px; text-align:left;
+    .blob-1 {
+      width: 300px;
+      height: 300px;
+      top: -80px;
+      left: -80px;
     }
-    .login-feature-icon { font-size:1.4rem; }
-    .login-feature-text { color:rgba(255,255,255,.85); font-size:.85rem; line-height:1.4; }
-    .login-feature-text strong { color:#fff; display:block; font-size:.9rem; }
+
+    .blob-2 {
+      width: 200px;
+      height: 200px;
+      bottom: -50px;
+      right: -50px;
+    }
+
+    .blob-3 {
+      width: 120px;
+      height: 120px;
+      top: 40%;
+      right: 20%;
+    }
+
+    .login-features {
+      margin-top: 36px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .login-feature {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255, 255, 255, .07);
+      border-radius: 10px;
+      padding: 12px 16px;
+      text-align: left;
+    }
+
+    .login-feature-icon {
+      font-size: 1.4rem;
+    }
+
+    .login-feature-text {
+      color: rgba(255, 255, 255, .85);
+      font-size: .85rem;
+      line-height: 1.4;
+    }
+
+    .login-feature-text strong {
+      color: #fff;
+      display: block;
+      font-size: .9rem;
+    }
   </style>
 </head>
+
 <body class="login-page">
 
   <div class="login-left">
@@ -112,7 +172,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="login-left-inner fade-up">
       <div style="font-size:3.5rem;margin-bottom:16px;">🫧</div>
       <h2>Biogas Containment<br><em>Monitoring System</em></h2>
-      <p>Real-time tracking of methane levels, gas flow rates, and containment integrity for safer biogas operations.</p>
+      <p>Real-time tracking of methane levels, gas flow rates, and containment integrity for safer biogas operations.
+      </p>
 
       <div class="login-features stagger">
         <div class="login-feature fade-up">
@@ -164,16 +225,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <form method="POST" action="">
         <div class="form-group">
           <label for="email">Email Address</label>
-          <input type="email" id="email" name="email"
-                 placeholder="you@example.com"
-                 value="<?= isset($email) ? e($email) : '' ?>"
-                 required autofocus>
+          <input type="email" id="email" name="email" placeholder="you@example.com"
+            value="<?= isset($email) ? e($email) : '' ?>" required autofocus>
         </div>
 
         <div class="form-group">
           <label for="password">Password</label>
-          <input type="password" id="password" name="password"
-                 placeholder="••••••••" required>
+          <input type="password" id="password" name="password" placeholder="••••••••" required>
         </div>
 
         <button type="submit" class="btn btn-primary btn-full">
@@ -188,4 +246,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </div>
 
 </body>
+
 </html>
