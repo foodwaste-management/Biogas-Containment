@@ -65,6 +65,25 @@ if (empty($chart_labels)) {
     }
 }
 
+// Fetch total gas used for impact stats
+$total_gas_used = 0;
+$r4 = $conn->query("SELECT SUM(gas_used) as total_gas FROM gas_usage WHERE user_id = $user_id");
+if ($r4 && $row4 = $r4->fetch_assoc()) {
+    $total_gas_used = (float) $row4['total_gas'];
+}
+
+// Fallback demo total gas if 0
+if ($total_gas_used == 0 && empty($chart_labels_check)) { // just use demo data when needed
+    $total_gas_used = 14500; // 14.5m3 demo data
+}
+
+// Calculate Impact Stats
+// 1000L (1 m3) biogas ≈ 0.46 kg LPG. LPG costs ~90 PHP/kg.
+$lpg_saved_kg = ($total_gas_used / 1000) * 0.46;
+$savings_php = $lpg_saved_kg * 90;
+// 1000L biogas replacing fossil fuel avoids ~1.25 kg CO2 eq
+$co2_saved_kg = ($total_gas_used / 1000) * 1.25;
+
 $chart_labels_json = json_encode($chart_labels);
 $chart_data_json = json_encode($chart_data);
 
@@ -293,6 +312,12 @@ $gas_class = $gas_left < 20 ? 'status-danger' : ($gas_left < 40 ? 'status-warn' 
             gap: 22px;
         }
 
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 22px;
+        }
+
         /* ── Cards ── */
         .card {
             background: #ffffff;
@@ -456,7 +481,9 @@ $gas_class = $gas_left < 20 ? 'status-danger' : ($gas_left < 40 ? 'status-warn' 
 
         /* ── Responsive ── */
         @media (max-width: 680px) {
-            .grid-2 {
+
+            .grid-2,
+            .grid-3 {
                 grid-template-columns: 1fr;
             }
 
@@ -509,6 +536,25 @@ $gas_class = $gas_left < 20 ? 'status-danger' : ($gas_left < 40 ? 'status-warn' 
 
     <!-- Main -->
     <main class="container">
+
+        <!-- Impact Stats -->
+        <div class="grid-3" style="margin-bottom: 8px;">
+            <div class="card" style="padding: 16px 20px;">
+                <div class="card-title" style="margin-bottom: 12px; color: #16a34a;">💰 Money Saved</div>
+                <div class="meta-val">₱<?php echo number_format($savings_php, 2) ?></div>
+                <div style="font-size: 11px; color: #a0aec0; margin-top: 4px;">Est. savings vs LPG</div>
+            </div>
+            <div class="card" style="padding: 16px 20px;">
+                <div class="card-title" style="margin-bottom: 12px; color: #16a34a;">🔥 LPG Equivalent</div>
+                <div class="meta-val"><?php echo number_format($lpg_saved_kg, 1) ?><span> kg</span></div>
+                <div style="font-size: 11px; color: #a0aec0; margin-top: 4px;">Fossil fuel offset</div>
+            </div>
+            <div class="card" style="padding: 16px 20px;">
+                <div class="card-title" style="margin-bottom: 12px; color: #16a34a;">🌍 CO₂ Reduced</div>
+                <div class="meta-val"><?php echo number_format($co2_saved_kg, 1) ?><span> kg</span></div>
+                <div style="font-size: 11px; color: #a0aec0; margin-top: 4px;">Emissions prevented</div>
+            </div>
+        </div>
 
         <!-- Real-Time Gas Usage -->
         <div class="card">
