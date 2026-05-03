@@ -26,16 +26,22 @@ The application uses a role-based access control system:
 - **Purpose**: Full system control and user management.
 - **Inputs**: User registration data, system logs.
 - **Outputs**: User accounts, global activity logs, system-wide sensor overview.
+<img width="1901" height="953" alt="image" src="https://github.com/user-attachments/assets/fbd9db64-0edd-4ebd-a318-250699611b2a" />
+
 
 ### 2. Manager Module (`/app/manager`)
 - **Purpose**: Data analysis and reporting.
 - **Inputs**: Filtered date ranges for sensor data.
 - **Outputs**: Detailed reports, activity summaries, performance tracking.
+<img width="1920" height="953" alt="image" src="https://github.com/user-attachments/assets/be7a32bf-43fc-42e5-bc9e-8009b4335265" />
+
 
 ### 3. User Module (`/app/user`)
 - **Purpose**: Personal monitoring for biogas facility owners.
 - **Inputs**: Real-time sensor readings (Methane, Gas Flow, Pressure).
 - **Outputs**: Interactive gauges, consumption charts, CSV data exports.
+<img width="1903" height="952" alt="image" src="https://github.com/user-attachments/assets/73738d92-e1cb-4142-a8ce-54d4d7715775" />
+
 
 ## Integration & Setup
 To deploy or integrate this system, follow these steps:
