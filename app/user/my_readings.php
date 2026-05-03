@@ -1,14 +1,16 @@
 <?php
-session_start();
+require_once __DIR__ . '/../../config/config.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: ../../index.php");
     exit;
 }
 
-$db = new PDO("mysql:host=localhost;dbname=foodwaste_db;charset=utf8", "root", "");
-$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+try {
+    $db = getDB();
+} catch (Exception $e) {
+    die("Database connection failed.");
+}
 
 $user_id = (int) $_SESSION['user_id'];
 $email = $_SESSION['email'] ?? 'user@example.com';
@@ -183,7 +185,7 @@ $level_logs = $stmt3->fetchAll();
         </div>
         <div class="header-right">
             <span class="user-chip"><?php echo htmlspecialchars($email); ?></span>
-            <a href="/Biogas-Containment/logout.php" class="btn-logout">Logout</a>
+            <a href="<?= BASE_URL ?>/logout.php" class="btn-logout">Logout</a>
         </div>
     </header>
 

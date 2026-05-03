@@ -18,20 +18,20 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 
-define('BASE_URL', '/Biogas-Containment');
+define('BASE_URL', '/bcms');
 
 
 // Production Credentials
-// define('DB_HOST', 'localhost');
-// define('DB_NAME', 'u442411629_bcms');
-// define('DB_USER', 'u442411629_dev_bcms');
-// define('DB_PASS', '4Pf2"3k7p8Nd');
+define('DB_HOST', 'YOUR_DB_HOST');
+define('DB_NAME', 'YOUR_DB_NAME');
+define('DB_USER', 'YOUR_DB_USER');
+define('DB_PASS', 'YOUR_DB_PASSWORD');
 
 // Local XAMPP Credentials
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'u442411629_bcms');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+// define('DB_HOST', 'localhost');
+// define('DB_NAME', 'u442411629_bcms');
+// define('DB_USER', 'root');
+// define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');
 
 // ── App Meta ─────────────────────────────────────────────────
